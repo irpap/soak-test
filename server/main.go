@@ -14,7 +14,6 @@ import (
 var uploadDir string
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	os.MkdirAll(uploadDir, 0600)
 	vars := mux.Vars(r)
 	filename := vars["key"]
 
