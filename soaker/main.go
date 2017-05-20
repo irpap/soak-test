@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"path"
 	"sync"
 )
 
@@ -17,54 +19,90 @@ func main() {
 	flag.StringVar(&server, "server", "http://localhost:8000", "Server address")
 	flag.Parse()
 
-	var wg sync.WaitGroup
+	serverDef := CatServerDefinition{baseUrl: server, resourcesDir: "test_resources"}
+	Soak(serverDef, requests, concurrency)
+}
 
+func Soak(def EndpointDefinition, requests int, concurrency int) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
 			MaxIdleConnsPerHost: 100,
+			DisableKeepAlives:   false,
+			DisableCompression:  false,
 		},
 	}
 
-	queue := make(chan int, concurrency)
-	wg.Add(requests)
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	queue := make(chan TestScenario, concurrency)
 
 	for i := 0; i < concurrency; i++ {
 		go func() {
-			for _ = range queue {
-				// fmt.Println("Executed:", n)
-				defer wg.Done()
-				testUpload(client)
+			defer wg.Done()
+			for scenario := range queue {
+				scenario.Run(client)
 			}
-
 		}()
-
 	}
 	for i := 0; i < requests; i++ {
-		queue <- i
-		// fmt.Println("Queued: ", i)
+		queue <- def.NextTest()
 	}
 	close(queue)
 	wg.Wait()
 }
 
-func testUpload(client *http.Client) {
-	file, err := os.Open("test_resources/test.txt")
+type EndpointDefinition interface {
+	NextTest() TestScenario
+}
+type TestScenario interface {
+	Run(client *http.Client)
+}
+
+type CatServerDefinition struct {
+	baseUrl      string
+	resourcesDir string
+}
+
+func (csd CatServerDefinition) NextTest() TestScenario {
+	return UploadPictureScenario{CatServerDefinition: csd}
+}
+
+type UploadPictureScenario struct {
+	CatServerDefinition
+}
+
+func (ups UploadPictureScenario) Run(client *http.Client) {
+	req, err := http.NewRequest("POST", ups.baseUrl+"/kitty/", nil)
+	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		fmt.Println("POST ", ups.baseUrl+"/kitty/", "Expected response status 200, got ", resp.StatusCode)
+		return
+	}
+
+	file, err := os.Open(path.Join(ups.resourcesDir, "cat.jpg"))
+	if err != nil {
+		log.Println(err)
+		return
 	}
 	defer file.Close()
 
-	req, err := http.NewRequest("POST", server+"/test.txt", file)
-	resp, err := client.Do(req)
+	req, err = http.NewRequest("POST", ups.baseUrl+"/kitty/bowl", nil)
+	resp, err = client.Do(req)
 	if err != nil {
-		fmt.Println("the request errored: ", err)
+		log.Println(err)
+		return
 	}
 
-	if resp == nil {
-		panic("Received nil response")
-	}
+	defer resp.Body.Close()
+	fmt.Println(resp.StatusCode)
 	if resp.StatusCode != 200 {
-		fmt.Println("Expected response status 200, got ", resp.StatusCode)
+		fmt.Println("POST ", ups.baseUrl+"/kitty/bowl", "Expected response status 200, got ", resp.StatusCode)
+		return
 	}
 }
