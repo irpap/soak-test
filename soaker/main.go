@@ -28,8 +28,6 @@ func Soak(def EndpointDefinition, requests int, concurrency int) {
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
 			MaxIdleConnsPerHost: 100,
-			DisableKeepAlives:   false,
-			DisableCompression:  false,
 		},
 	}
 
@@ -65,15 +63,18 @@ type CatServerDefinition struct {
 }
 
 func (csd CatServerDefinition) NextTest() TestScenario {
-	return UploadPictureScenario{CatServerDefinition: csd}
+	return CreateProfileScenario{CatServerDefinition: csd, profileName: "MissKitty", pictureName: "hai"}
 }
 
-type UploadPictureScenario struct {
+type CreateProfileScenario struct {
 	CatServerDefinition
+	profileName string
+	pictureName string
 }
 
-func (ups UploadPictureScenario) Run(client *http.Client) {
-	req, err := http.NewRequest("POST", ups.baseUrl+"/kitty/", nil)
+func (cps CreateProfileScenario) Run(client *http.Client) {
+	url := fmt.Sprintf("%s/%s/", cps.baseUrl, cps.profileName)
+	req, err := http.NewRequest("POST", url, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
@@ -81,18 +82,19 @@ func (ups UploadPictureScenario) Run(client *http.Client) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		fmt.Println("POST ", ups.baseUrl+"/kitty/", "Expected response status 200, got ", resp.StatusCode)
+		fmt.Println("POST ", url, "Expected response status 200, got ", resp.StatusCode)
 		return
 	}
 
-	file, err := os.Open(path.Join(ups.resourcesDir, "cat.jpg"))
+	file, err := os.Open(path.Join(cps.resourcesDir, "cat.jpg"))
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	defer file.Close()
 
-	req, err = http.NewRequest("POST", ups.baseUrl+"/kitty/bowl", nil)
+	url = fmt.Sprintf("%s/%s/%s", cps.baseUrl, cps.profileName, cps.pictureName)
+	req, err = http.NewRequest("POST", url, nil)
 	resp, err = client.Do(req)
 	if err != nil {
 		log.Println(err)
@@ -100,9 +102,8 @@ func (ups UploadPictureScenario) Run(client *http.Client) {
 	}
 
 	defer resp.Body.Close()
-	fmt.Println(resp.StatusCode)
 	if resp.StatusCode != 200 {
-		fmt.Println("POST ", ups.baseUrl+"/kitty/bowl", "Expected response status 200, got ", resp.StatusCode)
+		log.Println("POST ", url, "Expected response status 200, got ", resp.StatusCode)
 		return
 	}
 }
