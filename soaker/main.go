@@ -82,7 +82,7 @@ func (cps CreateProfileScenario) Run(client *http.Client) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		fmt.Println("POST ", url, "Expected response status 200, got ", resp.StatusCode)
+		log.Println("POST ", url, "Expected response status 200, got ", resp.StatusCode)
 		return
 	}
 
