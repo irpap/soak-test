@@ -10,20 +10,20 @@ import (
 	"sync"
 )
 
-var requests, concurrency int
+var numTests, concurrency int
 var server string
 
 func main() {
-	flag.IntVar(&requests, "n", 100000, "Number of requests to send")
-	flag.IntVar(&concurrency, "c", 100, "Number of concurrent requests")
+	flag.IntVar(&numTests, "n", 100000, "Number of tests")
+	flag.IntVar(&concurrency, "c", 100, "Number of concurrent tests")
 	flag.StringVar(&server, "server", "http://localhost:8000", "Server address")
 	flag.Parse()
 
 	serverDef := CatServerDefinition{baseUrl: server, resourcesDir: "test_resources"}
-	Soak(serverDef, requests, concurrency)
+	Soak(serverDef, numTests, concurrency)
 }
 
-func Soak(def EndpointDefinition, requests int, concurrency int) {
+func Soak(def EndpointDefinition, numTests int, concurrency int) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
@@ -43,7 +43,7 @@ func Soak(def EndpointDefinition, requests int, concurrency int) {
 			}
 		}()
 	}
-	for i := 0; i < requests; i++ {
+	for i := 0; i < numTests; i++ {
 		queue <- def.NextTest()
 	}
 	close(queue)
