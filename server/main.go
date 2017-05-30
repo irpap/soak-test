@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -39,6 +38,7 @@ func createProfile(w http.ResponseWriter, r *http.Request) {
 	defer mutex.Unlock()
 	os.RemoveAll(path.Join(uploadDir, directory))
 	if err := os.Mkdir(path.Join(uploadDir, directory), os.FileMode(0755)); err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -52,17 +52,19 @@ func uploadPicture(w http.ResponseWriter, r *http.Request) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if _, err := os.Stat(path.Join(uploadDir, directory)); os.IsNotExist(err) {
+		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	out, err := os.Create(path.Join(uploadDir, directory, filename))
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 	if _, err := io.Copy(out, r.Body); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
